@@ -22,7 +22,7 @@ jobs:
 
       - name: Install deps
         run: |
-          npm ci
+          npm install
           npx playwright install --with-deps chromium
 
       # 前回保存したnoteのログインセッションを復元
