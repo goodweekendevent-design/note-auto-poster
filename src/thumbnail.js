@@ -17,8 +17,8 @@ function wrap(text, perLine = 12) {
   return lines.slice(0, 4); // 最大4行
 }
 
-const lines = wrap(title);
-const fontSize = lines.length >= 3 ? 64 : 76;
+const lines = wrap(title, 10);
+const fontSize = lines.length >= 3 ? 76 : 92;
 const lineHeight = fontSize * 1.4;
 const startY = H / 2 - ((lines.length - 1) * lineHeight) / 2;
 
@@ -35,7 +35,7 @@ const textSvg = `
       fill: #ffffff;
       paint-order: stroke;
       stroke: #333333;
-      stroke-width: 14px;
+      stroke-width: 0px;
       stroke-linejoin: round;
     }
   </style>
