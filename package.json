@@ -1,0 +1,13 @@
+{
+  "name": "note-auto-poster",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "generate": "node src/generate.js",
+    "post": "node src/post.js",
+    "run": "node src/generate.js && node src/post.js"
+  },
+  "dependencies": {
+    "playwright": "^1.45.0"
+  }
+}
