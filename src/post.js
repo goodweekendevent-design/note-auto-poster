@@ -69,6 +69,31 @@ async function main() {
       process.exit(1);
     }
 
+    // ── 2.5 見出し画像のアップロード ──
+    if (fs.existsSync("thumbnail.png")) {
+      try {
+        // 「画像を追加」エリアをクリックするとファイル選択が開く
+        const [chooser] = await Promise.all([
+          page.waitForEvent("filechooser", { timeout: 10000 }),
+          page
+            .locator('button:has-text("画像"), [aria-label*="画像"], [class*="headerImage"], [class*="eyecatch"]')
+            .first()
+            .click(),
+        ]);
+        await chooser.setFiles("thumbnail.png");
+        await page.waitForTimeout(3000);
+        // トリミング確認ダイアログが出た場合は保存を押す
+        const saveBtn = page.locator('button:has-text("保存")');
+        if (await saveBtn.count()) await saveBtn.first().click();
+        await page.waitForTimeout(3000);
+        await shot(page, "thumbnail-uploaded");
+        console.log("見出し画像を設定しました");
+      } catch (e) {
+        console.log("見出し画像の設定に失敗(記事投稿は続行):", e.message);
+        await shot(page, "thumbnail-failed");
+      }
+    }
+    
     // ── 3. タイトル入力 ──
     const titleBox = page
       .locator('textarea[placeholder*="タイトル"], [aria-label*="タイトル"], textarea')
