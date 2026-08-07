@@ -1,5 +1,6 @@
 // src/generate.js
 // Claude API で記事(タイトル+本文)を生成し、article.json に保存する
+// JSONではなく区切り文字方式で受け取る(引用符でパースが壊れるのを防ぐ)
 // 必要な環境変数: ANTHROPIC_API_KEY
 
 import fs from "fs";
@@ -10,7 +11,12 @@ if (!API_KEY) {
   process.exit(1);
 }
 
-// topics.txt の先頭行をテーマとして使う(なければ汎用テーマ)
+// ★ここに固定の役割・文体設定を書く(topics.txtにはテーマだけを書く)
+const PERSONA = `あなたは、Excel・AI活用を専門とする実務経験10年以上のエンジニアです。
+Excel初心者の事務職の読者に向けて、今日から使える具体的なワザを、実際の手順つきで解説します。
+文体はです・ます調。専門用語には必ず一言の説明を添える。
+AIっぽい定型句(「いかがでしたか」等)は使わない。`;
+
 function pickTopic() {
   try {
     const lines = fs
@@ -20,12 +26,11 @@ function pickTopic() {
       .filter(Boolean);
     if (lines.length > 0) {
       const topic = lines[0];
-      // 使ったテーマを消して書き戻す(リポジトリにコミットするのはworkflow側)
       fs.writeFileSync("topics.txt", lines.slice(1).join("\n") + "\n");
       return topic;
     }
   } catch (_) {}
-  return "最近のテクノロジーと暮らしについて、読者の役に立つテーマを自由に1つ選ぶ";
+  return "Excel×AIの時短ワザから、読者の役に立つテーマを1つ自由に選ぶ";
 }
 
 async function main() {
@@ -43,6 +48,12 @@ async function main() {
       model: "claude-sonnet-4-6",
       max_tokens: 4000,
       system:
+        PERSONA +
+        "\n\n出力形式は必ず次に従うこと:\n" +
+        "1行目: TITLE: に続けて記事タイトル(30字以内)\n" +
+        "2行目: BODY:\n" +
+        "3行目以降: 本文(2000〜3000字。空行で段落分け。見出し行は先頭に「## 」)\n" +
+        "この形式以外の前置き・後書き・コードフェンスは一切出力しない。"
         "あなたはExcel・AI活用を専門とする実務経験10年以上の業務改善コンサルタントで、note向けの記事ライターです。" +
         "必ずJSONのみを返してください。前置きやコードブロック(```)は一切不要。" +
         'フォーマット: {"title": "記事タイトル(30字以内)", "body": "本文"}' +
@@ -68,10 +79,7 @@ async function main() {
         "存在しない機能や不確かな情報は書かず、不確かな場合はその旨を明記する。" +
         "JSON文字列内の改行は\\nでエスケープし、必ず有効なJSONとして返す。",
       messages: [
-        {
-          role: "user",
-          content: `次のテーマでnote記事を書いてください: ${topic}`,
-        },
+        { role: "user", content: `次のテーマでnote記事を書いてください: ${topic}` },
       ],
     }),
   });
@@ -86,21 +94,21 @@ async function main() {
     .filter((c) => c.type === "text")
     .map((c) => c.text)
     .join("\n")
-    .replace(/```json|```/g, "")
     .trim();
 
-  let article;
-  try {
-    article = JSON.parse(text);
-  } catch (e) {
-    console.error("JSONパース失敗。生テキスト:\n", text);
+  // ── 区切り文字方式のパース ──
+  const titleMatch = text.match(/^TITLE:\s*(.+)$/m);
+  const bodyIndex = text.indexOf("BODY:");
+
+  if (!titleMatch || bodyIndex === -1) {
+    console.error("形式が想定と違います。生テキスト:\n", text.slice(0, 500));
     process.exit(1);
   }
 
-  if (!article.title || !article.body) {
-    console.error("title/bodyが欠落:", article);
-    process.exit(1);
-  }
+  const article = {
+    title: titleMatch[1].trim(),
+    body: text.slice(bodyIndex + "BODY:".length).trim(),
+  };
 
   fs.writeFileSync("article.json", JSON.stringify(article, null, 2));
   console.log("生成完了:", article.title);
