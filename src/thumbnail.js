@@ -18,7 +18,7 @@ function wrap(text, perLine = 12) {
 }
 
 const lines = wrap(title, 10);
-const fontSize = lines.length >= 3 ? 76 : 92;
+const fontSize = lines.length >= 3 ? 92 : 100;
 const lineHeight = fontSize * 1.4;
 const startY = H / 2 - ((lines.length - 1) * lineHeight) / 2;
 
