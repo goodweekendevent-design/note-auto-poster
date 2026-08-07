@@ -10,6 +10,10 @@ on:
         description: "trueで公開 / falseで下書き"
         default: "false"
 
+permissions:
+     contents: write
+     issues: write
+
 jobs:
   post:
     runs-on: ubuntu-latest
@@ -59,6 +63,36 @@ jobs:
           git add topics.txt || true
           git diff --cached --quiet || git commit -m "consume topic [skip ci]"
           git push || true
+
+      - name: Notify success
+        if: success()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TITLE=$(grep '^title=' result.txt | cut -d= -f2-)
+          URL=$(grep '^url=' result.txt | cut -d= -f2-)
+          MODE=$(grep '^mode=' result.txt | cut -d= -f2-)
+          gh issue create \
+            --title "✅ note投稿成功(${MODE}): ${TITLE}" \
+            --body "記事「${TITLE}」を${MODE}として保存しました。
+
+          編集画面: ${URL}
+          下書き一覧: https://note.com/sitesettings/text
+
+          実行ログ: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+
+      - name: Notify failure
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh issue create \
+            --title "❌ note自動投稿が失敗しました" \
+            --body "実行ログとスクショを確認してください。
+
+          実行ログ: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+          よくある原因: NOTE_SESSIONの期限切れ、noteのUI変更。"
 
       # 失敗時のデバッグ用スクショを保存
       - name: Upload screenshots
