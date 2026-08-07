@@ -135,9 +135,33 @@ async function main() {
     await page.waitForTimeout(3000); // 自動保存待ち
 
     if (PUBLISH) {
+      // ── 5. 公開フロー ──
       await page.click('button:has-text("公開に進む")');
-      await page.waitForTimeout(2500);
+      await page.waitForTimeout(3000);
       await shot(page, "publish-settings");
+
+      // ハッシュタグの入力(失敗しても投稿は続行)
+      if (article.tags && article.tags.length) {
+        try {
+          const tagInput = page
+            .locator('input[placeholder*="ハッシュタグ"], input[placeholder*="タグ"]')
+            .first();
+          await tagInput.waitFor({ timeout: 8000 });
+          for (const tag of article.tags) {
+            await tagInput.click();
+            await page.keyboard.type(tag, { delay: 30 });
+            await page.waitForTimeout(500);
+            await page.keyboard.press("Enter");
+            await page.waitForTimeout(800);
+          }
+          await shot(page, "tags-filled");
+          console.log("タグを設定しました:", article.tags.join(" / "));
+        } catch (e) {
+          console.log("タグの設定に失敗(投稿は続行):", e.message);
+          await shot(page, "tags-failed");
+        }
+      }
+
       await page.click('button:has-text("投稿")');
       await page.waitForTimeout(3000);
       console.log("公開しました:", article.title);
