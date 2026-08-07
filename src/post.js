@@ -141,11 +141,19 @@ async function main() {
       await page.click('button:has-text("投稿")');
       await page.waitForTimeout(3000);
       console.log("公開しました:", article.title);
+      fs.writeFileSync(
+        "result.txt",
+        `title=${article.title}\nurl=${page.url()}\nmode=公開`
+      );
     } else {
       const draftBtn = page.locator('button:has-text("下書き保存")');
       if (await draftBtn.count()) await draftBtn.first().click();
       await page.waitForTimeout(2000);
       console.log("下書き保存しました:", article.title);
+      fs.writeFileSync(
+        "result.txt",
+        `title=${article.title}\nurl=${page.url()}\nmode=下書き`
+      );
     }
 
     await shot(page, "done");
