@@ -1,22 +1,16 @@
 // src/post.js
-// Playwright で note.com にログインし、article.json の記事を投稿する
-// 必要な環境変数:
-//   NOTE_EMAIL, NOTE_PASSWORD  … noteのログイン情報
-//   PUBLISH=true               … 付けると公開。付けなければ下書き保存
-//
-// 注意: noteのUIは変わることがあるので、セレクタが壊れたら
-// DEBUG=true で実行してスクショ(debug-*.png)を見ながら直してください。
+// セッションCookie方式: NOTE_SESSION (=ブラウザの _note_session_v5 の値) でログインをスキップ
+// 必要な環境変数: NOTE_SESSION / PUBLISH=true で公開(なければ下書き) / DEBUG=true でスクショ
 
 import { chromium } from "playwright";
 import fs from "fs";
 
-const EMAIL = process.env.NOTE_EMAIL;
-const PASSWORD = process.env.NOTE_PASSWORD;
+const SESSION = process.env.NOTE_SESSION;
 const PUBLISH = process.env.PUBLISH === "true";
 const DEBUG = process.env.DEBUG === "true";
 
-if (!EMAIL || !PASSWORD) {
-  console.error("NOTE_EMAIL / NOTE_PASSWORD が設定されていません");
+if (!SESSION) {
+  console.error("NOTE_SESSION が設定されていません");
   process.exit(1);
 }
 
@@ -35,74 +29,72 @@ async function main() {
     locale: "ja-JP",
     userAgent:
       "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36",
-    storageState: fs.existsSync("state.json") ? "state.json" : undefined,
   });
+
+  // ブラウザから持ってきたセッションCookieを注入
+  await context.addCookies([
+    {
+      name: "_note_session_v5",
+      value: SESSION,
+      domain: ".note.com",
+      path: "/",
+      httpOnly: true,
+      secure: true,
+      sameSite: "Lax",
+    },
+  ]);
+
   const page = await context.newPage();
 
   try {
-    // ── 1. ログイン(セッションが生きていればスキップされる) ──
-    await page.goto("https://note.com/login", { waitUntil: "domcontentloaded" });
-    await page.waitForTimeout(2000);
+    // ── 1. ログイン状態の確認 ──
+    await page.goto("https://note.com", { waitUntil: "domcontentloaded" });
+    await page.waitForTimeout(3000);
+    await shot(page, "top");
 
     if (page.url().includes("/login")) {
-      console.log("ログイン処理を実行...");
-      await page.fill('input[type="email"], #email', EMAIL);
-      await page.fill('input[type="password"], #password', PASSWORD);
-      await shot(page, "login-filled");
-      await page.click('button:has-text("ログイン")');
-      await page.waitForURL((url) => !url.href.includes("/login"), {
-        timeout: 30000,
-      });
-      console.log("ログイン成功");
-    } else {
-      console.log("既存セッションでログイン済み");
+      console.error("セッションが無効です。Cookieを取り直してNOTE_SESSIONを更新してください");
+      await shot(page, "session-invalid");
+      process.exit(1);
     }
+    console.log("セッション有効。エディタを開きます");
 
-    // セッションを保存(次回以降のログイン省略用)
-    await context.storageState({ path: "state.json" });
-
-    // ── 2. 新規記事エディタを開く ──
-    await page.goto("https://note.com/notes/new", {
-      waitUntil: "domcontentloaded",
-    });
-    await page.waitForTimeout(3000);
+    // ── 2. 新規記事エディタ ──
+    await page.goto("https://note.com/notes/new", { waitUntil: "domcontentloaded" });
+    await page.waitForTimeout(4000);
     await shot(page, "editor");
+
+    if (page.url().includes("/login")) {
+      console.error("エディタでログイン画面にリダイレクトされました。セッション切れです");
+      process.exit(1);
+    }
 
     // ── 3. タイトル入力 ──
     const titleBox = page
-      .locator('textarea[placeholder*="タイトル"], [aria-label*="タイトル"]')
+      .locator('textarea[placeholder*="タイトル"], [aria-label*="タイトル"], textarea')
       .first();
     await titleBox.waitFor({ timeout: 15000 });
     await titleBox.fill(article.title);
 
-    // ── 4. 本文入力(contenteditable に1行ずつタイプ) ──
+    // ── 4. 本文入力 ──
     const body = page.locator('[contenteditable="true"]').last();
     await body.click();
     for (const line of article.body.split("\n")) {
-      if (line.startsWith("## ")) {
-        // 見出し: そのままテキストとして入れる(装飾は手動 or 省略)
-        await page.keyboard.type(line.replace(/^## /, ""), { delay: 5 });
-      } else {
-        await page.keyboard.type(line, { delay: 5 });
-      }
+      const text = line.startsWith("## ") ? line.replace(/^## /, "") : line;
+      if (text) await page.keyboard.type(text, { delay: 5 });
       await page.keyboard.press("Enter");
     }
     await shot(page, "body-filled");
-
-    // noteは自動保存されるので少し待つ
-    await page.waitForTimeout(3000);
+    await page.waitForTimeout(3000); // 自動保存待ち
 
     if (PUBLISH) {
-      // ── 5. 公開フロー ──
       await page.click('button:has-text("公開に進む")');
-      await page.waitForTimeout(2000);
+      await page.waitForTimeout(2500);
       await shot(page, "publish-settings");
-      // 公開設定画面の「投稿する」ボタン
       await page.click('button:has-text("投稿")');
       await page.waitForTimeout(3000);
       console.log("公開しました:", article.title);
     } else {
-      // 下書き保存ボタンがあれば押す(自動保存でも残る)
       const draftBtn = page.locator('button:has-text("下書き保存")');
       if (await draftBtn.count()) await draftBtn.first().click();
       await page.waitForTimeout(2000);
