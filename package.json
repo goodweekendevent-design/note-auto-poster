@@ -8,6 +8,7 @@
     "run": "node src/generate.js && node src/post.js"
   },
   "dependencies": {
-    "playwright": "^1.45.0"
+    "playwright": "^1.45.0",
+    "sharp": "^0.33.0"
   }
 }
