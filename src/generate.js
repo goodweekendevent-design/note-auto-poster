@@ -68,3 +68,26 @@ async function main() {
 
   const data = await res.json();
   const text = data.content
+    .filter((c) => c.type === "text")
+    .map((c) => c.text)
+    .join("\n")
+    .trim();
+
+  const titleMatch = text.match(/^TITLE:\s*(.+)$/m);
+  const bodyIndex = text.indexOf("BODY:");
+
+  if (!titleMatch || bodyIndex === -1) {
+    console.error("形式が想定と違います。生テキスト:\n", text.slice(0, 500));
+    process.exit(1);
+  }
+
+  const article = {
+    title: titleMatch[1].trim(),
+    body: text.slice(bodyIndex + "BODY:".length).trim(),
+  };
+
+  fs.writeFileSync("article.json", JSON.stringify(article, null, 2));
+  console.log("生成完了:", article.title);
+}
+
+main();
