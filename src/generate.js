@@ -20,8 +20,13 @@ const FORMAT = `
 
 出力形式は必ず次に従うこと:
 1行目: TITLE: に続けて記事タイトル(30字以内)
-2行目: BODY:
-3行目以降: 本文(2000〜3000字。空行で段落分け。見出し行は先頭に「## 」)
+2行目: TAGS: に続けてハッシュタグを5個、半角カンマ区切り(#は付けない)
+3行目: BODY:
+4行目以降: 本文(2000〜3000字。空行で段落分け。見出し行は先頭に「## 」)
+
+TAGSの選び方: noteで多くの人が使っている一般的なタグを優先する。
+5個のうち2個は「Excel」「AI」のような広く検索されるタグ、
+3個は記事の内容に固有のタグにする。
 この形式以外の前置き・後書き・コードフェンスは一切出力しない。`;
 
 function pickTopic() {
@@ -74,6 +79,7 @@ async function main() {
     .trim();
 
   const titleMatch = text.match(/^TITLE:\s*(.+)$/m);
+  const tagsMatch = text.match(/^TAGS:\s*(.+)$/m);
   const bodyIndex = text.indexOf("BODY:");
 
   if (!titleMatch || bodyIndex === -1) {
@@ -81,13 +87,23 @@ async function main() {
     process.exit(1);
   }
 
+  const tags = tagsMatch
+    ? tagsMatch[1]
+        .split(",")
+        .map((t) => t.trim().replace(/^#/, ""))
+        .filter(Boolean)
+        .slice(0, 5)
+    : [];
+
   const article = {
     title: titleMatch[1].trim(),
+    tags,
     body: text.slice(bodyIndex + "BODY:".length).trim(),
   };
 
   fs.writeFileSync("article.json", JSON.stringify(article, null, 2));
   console.log("生成完了:", article.title);
+  console.log("タグ:", tags.join(" / "));
 }
 
 main();
