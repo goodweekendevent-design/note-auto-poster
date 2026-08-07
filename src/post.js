@@ -69,7 +69,6 @@ async function main() {
       process.exit(1);
     }
 
-    // ── 2.5 見出し画像のアップロード ──
     // ── 2.5 見出し画像のアップロード(失敗しても投稿は続行) ──
     if (fs.existsSync("thumbnail.png")) {
       try {
@@ -81,24 +80,39 @@ async function main() {
         await page.waitForTimeout(1500);
         await shot(page, "thumbnail-menu");
 
-        // 2クリック目: メニューの「画像をアップロード」→ ここでファイル選択が開く
+        // 2クリック目: メニューの「画像をアップロード」→ ファイル選択が開く
         const [chooser] = await Promise.all([
           page.waitForEvent("filechooser", { timeout: 10000 }),
           page.locator('text=画像をアップロード').first().click(),
         ]);
         await chooser.setFiles("thumbnail.png");
-        await page.waitForTimeout(3000);
+
+        // トリミング画面(モーダル)が開くのを待つ
+        await page.waitForSelector('[data-testid="cropper"]', { timeout: 15000 });
+        await page.waitForTimeout(1500);
         await shot(page, "thumbnail-crop");
 
-        // トリミング/確認ダイアログが出た場合は保存を押す
-        const saveBtn = page.locator('button:has-text("保存")');
-        if (await saveBtn.count()) await saveBtn.first().click();
-        await page.waitForTimeout(3000);
+        // モーダル内の「保存」ボタンを押す
+        const modal = page.locator(".ReactModalPortal");
+        await modal
+          .locator('button:has-text("保存"), button:has-text("設定"), button:has-text("適用")')
+          .first()
+          .click();
+
+        // モーダルが完全に閉じるのを待ってから次へ
+        await page.waitForSelector('[data-testid="cropper"]', {
+          state: "detached",
+          timeout: 15000,
+        });
+        await page.waitForTimeout(2000);
         await shot(page, "thumbnail-uploaded");
         console.log("見出し画像を設定しました");
       } catch (e) {
         console.log("見出し画像の設定に失敗(記事投稿は続行):", e.message);
         await shot(page, "thumbnail-failed");
+        // モーダルが開きっぱなしだと後続が失敗するのでEscで閉じておく
+        await page.keyboard.press("Escape");
+        await page.waitForTimeout(1000);
       }
     }
     
