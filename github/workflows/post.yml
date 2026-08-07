@@ -1,0 +1,65 @@
+name: Auto post to note
+
+on:
+  schedule:
+    # 毎日 朝9時(JST) = 0:00 UTC に実行
+    - cron: "0 0 * * *"
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: "trueで公開 / falseで下書き"
+        default: "false"
+
+jobs:
+  post:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install deps
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+
+      # 前回保存したnoteのログインセッションを復元
+      - name: Restore session
+        uses: actions/cache@v4
+        with:
+          path: state.json
+          key: note-session-${{ github.run_id }}
+          restore-keys: note-session-
+
+      - name: Generate article with Claude
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: node src/generate.js
+
+      - name: Post to note
+        env:
+          NOTE_EMAIL: ${{ secrets.NOTE_EMAIL }}
+          NOTE_PASSWORD: ${{ secrets.NOTE_PASSWORD }}
+          PUBLISH: ${{ github.event.inputs.publish || 'false' }}
+          DEBUG: "true"
+        run: node src/post.js
+
+      # 消費したtopics.txtをコミットして戻す
+      - name: Commit topic consumption
+        run: |
+          git config user.name "note-bot"
+          git config user.email "bot@example.com"
+          git add topics.txt || true
+          git diff --cached --quiet || git commit -m "consume topic [skip ci]"
+          git push || true
+
+      # 失敗時のデバッグ用スクショを保存
+      - name: Upload screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: debug-screenshots
+          path: debug-*.png
+          if-no-files-found: ignore
