@@ -8,7 +8,7 @@ on:
     inputs:
       publish:
         description: "trueで公開 / falseで下書き"
-        default: "false"
+        default: "true"
 
 permissions:
      contents: write
