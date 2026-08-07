@@ -70,19 +70,27 @@ async function main() {
     }
 
     // ── 2.5 見出し画像のアップロード ──
+    // ── 2.5 見出し画像のアップロード(失敗しても投稿は続行) ──
     if (fs.existsSync("thumbnail.png")) {
       try {
-        // 「画像を追加」エリアをクリックするとファイル選択が開く
+        // 1クリック目: 画像アイコンを押してメニューを開く
+        await page
+          .locator('button:has-text("画像"), [aria-label*="画像"], [class*="headerImage"], [class*="eyecatch"]')
+          .first()
+          .click();
+        await page.waitForTimeout(1500);
+        await shot(page, "thumbnail-menu");
+
+        // 2クリック目: メニューの「画像をアップロード」→ ここでファイル選択が開く
         const [chooser] = await Promise.all([
           page.waitForEvent("filechooser", { timeout: 10000 }),
-          page
-            .locator('button:has-text("画像"), [aria-label*="画像"], [class*="headerImage"], [class*="eyecatch"]')
-            .first()
-            .click(),
+          page.locator('text=画像をアップロード').first().click(),
         ]);
         await chooser.setFiles("thumbnail.png");
         await page.waitForTimeout(3000);
-        // トリミング確認ダイアログが出た場合は保存を押す
+        await shot(page, "thumbnail-crop");
+
+        // トリミング/確認ダイアログが出た場合は保存を押す
         const saveBtn = page.locator('button:has-text("保存")');
         if (await saveBtn.count()) await saveBtn.first().click();
         await page.waitForTimeout(3000);
