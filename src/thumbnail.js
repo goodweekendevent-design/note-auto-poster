@@ -32,10 +32,10 @@ const textSvg = `
     text {
       font-family: "Noto Sans CJK JP", "Noto Sans JP", sans-serif;
       font-weight: 700;
-      fill: #222222;
+      fill: #ffffff;
       paint-order: stroke;
-      stroke: #ffffff;
-      stroke-width: 10px;
+      stroke: #333333;
+      stroke-width: 14px;
       stroke-linejoin: round;
     }
   </style>
