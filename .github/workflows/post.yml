@@ -51,7 +51,7 @@ jobs:
       - name: Post to note
         env:
           NOTE_SESSION: ${{ secrets.NOTE_SESSION }}
-          PUBLISH: ${{ github.event.inputs.publish || 'false' }}
+          PUBLISH: ${{ github.event.inputs.publish || 'true' }}
           DEBUG: "true"
         run: node src/post.js
 
