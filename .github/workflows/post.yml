@@ -3,7 +3,7 @@ name: Auto post to note
 on:
   schedule:
     # 毎日 朝9時(JST) = 0:00 UTC に実行
-    - cron: "0 0 * * *"
+    - cron: "0 0 */2 * *"
   workflow_dispatch:
     inputs:
       publish:
