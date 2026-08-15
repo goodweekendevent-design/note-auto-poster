@@ -37,9 +37,9 @@ jobs:
           key: note-session-${{ github.run_id }}
           restore-keys: note-session-
 
-      - name: Generate article with Claude
+      - name: Generate article with Gemini
         env:
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: node src/generate.js
 
       - name: Install Japanese fonts
